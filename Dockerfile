@@ -27,12 +27,12 @@ RUN OLD_UID="$(id -u student)" && \
     usermod -u "$NEW_UID" -g "$NEW_GID" student && \
     find /home -user "$OLD_UID" -execdir chown -h "$NEW_UID" {} + && \
     find /home -group "$OLD_GID" -execdir chgrp -h "$NEW_GID" {} +
-ENV PL_USER student
+ENV PL_USER=student
 
 # x86 tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        sudo gosu ca-certificates curl wget bzip2 net-tools build-essential libssl-dev manpages-dev \
-        vim=2:9.1.0016-1ubuntu7.8 neovim emacs-nox nano tmux ssh git less file xxd && \
+        sudo gosu ca-certificates curl wget bzip2 net-tools build-essential libssl-dev manpages-dev zstd \
+        vim neovim emacs-nox nano tmux ssh git less file xxd && \
     # helix
     curl -L https://github.com/helix-editor/helix/releases/download/25.01/helix-25.01-x86_64-linux.tar.xz | tar -xJv -C / &&\
     rm -rf /helix-25.01-x86_64-linux/runtime/grammars &&\
@@ -126,7 +126,7 @@ RUN rm -rf valgrind-3.24.0 valgrind-3.24.0.tar.bz2 && \
     echo '#!/bin/bash' > /usr/local/libexec/valgrind/memcheck-arm-linux && \
     echo 'exec qemu-arm-static /usr/local/libexec/valgrind/memcheck-arm-linux-wrapper "$@"' >> /usr/local/libexec/valgrind/memcheck-arm-linux && \
     chmod +x /usr/local/libexec/valgrind/memcheck-arm-linux
-ENV VALGRIND_OPTS "--vgdb=no"
+ENV VALGRIND_OPTS="--vgdb=no"
 
 # exec hook
 COPY hook_execve.c check_arch_arm.c /
@@ -137,7 +137,7 @@ RUN QEMU_HASH="$(sha256sum /usr/bin/qemu-arm-static | awk "{print \$1}")" && \
     mv /hook_execve.so /usr/lib/hook_execve.so && \
     mv /check_arch_arm /usr/bin/check_arch_arm && \
     rm hook_execve.c check_arch_arm.c
-ENV LD_PRELOAD /usr/lib/hook_execve.so
+ENV LD_PRELOAD=/usr/lib/hook_execve.so
 
 # xterm rs
 RUN mkdir /xterm
@@ -157,7 +157,7 @@ USER root
 RUN mkdir -p /run /var/run && \
     touch /run/fixuid.ran /var/run/fixuid.ran
 
-ENV PATH "/usr/armbin:$PATH"
+ENV PATH="/usr/armbin:$PATH"
 ENV IMAGE_VERSION="v1.0.0"
 USER student
 ENTRYPOINT ["/usr/bin/container-entry"]
