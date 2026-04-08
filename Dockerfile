@@ -31,7 +31,7 @@ ENV PL_USER=student
 
 # x86 tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        sudo gosu ca-certificates curl wget bzip2 net-tools build-essential libssl-dev manpages-dev zstd \
+        sudo gosu ca-certificates curl wget bzip2 net-tools build-essential gdb-multiarch libssl-dev manpages-dev zstd \
         vim neovim emacs-nox nano tmux ssh git less file xxd && \
     # helix
     curl -L https://github.com/helix-editor/helix/releases/download/25.01/helix-25.01-x86_64-linux.tar.xz | tar -xJv -C / &&\
@@ -67,76 +67,47 @@ RUN update-alternatives --set vim /usr/bin/vim.basic && \
         augroup END\n\
     endif' >> /etc/vim/vimrc
 
-# arm gnu toolchain
-RUN curl -L https://github.com/multiarch/qemu-user-static/releases/download/v7.2.0-1/qemu-arm-static -o /usr/bin/qemu-arm-static && \
-    chmod +x /usr/bin/qemu-arm-static && \
-    curl -L https://static.jyh.sb/source/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz -O && \
-    tar -xvf /arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz -C / && \
-    mv /arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-linux-gnueabihf /usr/arm-gnu-toolchain && \
-    rm /arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
-ENV QEMU_LD_PREFIX=/usr/arm-gnu-toolchain/arm-none-linux-gnueabihf/libc
+# riscv32 gnu toolchain
+RUN curl -L https://github.com/multiarch/qemu-user-static/releases/download/v7.2.0-1/qemu-riscv32-static -o /usr/bin/qemu-riscv32-static && \
+    chmod +x /usr/bin/qemu-riscv32-static && \
+    curl -L https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2026.04.05/riscv32-glibc-ubuntu-24.04-gcc.tar.xz -o /tmp/riscv32-glibc-ubuntu-24.04-gcc.tar.xz && \
+    mkdir -p /usr/riscv32-toolchain && \
+    tar -xvf /tmp/riscv32-glibc-ubuntu-24.04-gcc.tar.xz -C /usr/riscv32-toolchain --strip-components=1 && \
+    rm /tmp/riscv32-glibc-ubuntu-24.04-gcc.tar.xz
+ENV RISCV_TOOLCHAIN=/usr/riscv32-toolchain
+ENV QEMU_LD_PREFIX=/usr/riscv32-toolchain/sysroot
 
 # symbolic link
-RUN ln -s /usr/arm-gnu-toolchain/bin/* /usr/bin/ &&\
-    mkdir -p /usr/armbin && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-addr2line /usr/armbin/addr2line && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-nm /usr/armbin/nm && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-readelf /usr/armbin/readelf && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-strings /usr/armbin/strings && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-strip /usr/armbin/strip && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-ar /usr/armbin/ar && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-as /usr/armbin/as && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-g++ /usr/armbin/g++ && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-cpp /usr/armbin/cpp && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-ld /usr/armbin/ld && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-ranlib /usr/armbin/ranlib && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-gprof /usr/armbin/gprof && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-elfedit /usr/armbin/elfedit && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-objcopy /usr/armbin/objcopy && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-objdump /usr/armbin/objdump && \
-    ln -s /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-size /usr/armbin/size && \
-    echo '#!/bin/bash' > /usr/armbin/gcc && \
-    echo 'exec /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-gcc $GCC_WRAPPER_FLAGS "$@"' >> /usr/armbin/gcc && \
-    chmod +x /usr/armbin/gcc
+RUN mkdir -p /usr/riscvbin && \
+    TOOLCHAIN_GCC="$(find /usr/riscv32-toolchain/bin -maxdepth 1 -type f -name '*-gcc' | head -n 1)" && \
+    [ -n "$TOOLCHAIN_GCC" ] && \
+    TOOLCHAIN_PREFIX="${TOOLCHAIN_GCC##*/}" && \
+    TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX%-gcc}" && \
+    for tool in addr2line nm readelf strings strip ar as g++ cpp ld ranlib objcopy objdump size; do \
+        TARGET="/usr/riscv32-toolchain/bin/${TOOLCHAIN_PREFIX}-${tool}"; \
+        if [ -f "$TARGET" ]; then \
+            ln -s "$TARGET" "/usr/riscvbin/${tool}"; \
+        fi; \
+    done && \
+    printf '#!/bin/bash\nexec /usr/riscv32-toolchain/bin/%s-gcc $GCC_WRAPPER_FLAGS "$@"\n' "$TOOLCHAIN_PREFIX" > /usr/riscvbin/gcc && \
+    chmod +x /usr/riscvbin/gcc
 
 # gdb wrapper & man page
 RUN apt-get update -y && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y unminimize man-db && \
     yes | /usr/bin/unminimize || [ $? -eq 141 ]
     # mkdir -p /usr/local/man/man1
-COPY gdb cse30db /usr/armbin/
-RUN chmod +x /usr/armbin/gdb /usr/armbin/cse30db
-COPY cse30db.1 /usr/local/man/man1/
-
-# cross compile valgrind
-RUN curl -L https://static.jyh.sb/source/valgrind-3.24.0.tar.bz2 -O && \
-    tar -jxf valgrind-3.24.0.tar.bz2
-WORKDIR /valgrind-3.24.0
-RUN sed -i 's/armv7/arm/g' ./configure && \
-    ./configure --host=arm-none-linux-gnueabihf \
-                --prefix=/usr/local \
-                CFLAGS=-static \
-                CC=/usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-gcc \
-                CPP=/usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-cpp && \
-    make CFLAGS+="-fPIC" -j"$(nproc)" && \
-    make install
-WORKDIR /
-RUN rm -rf valgrind-3.24.0 valgrind-3.24.0.tar.bz2 && \
-    mv /usr/local/libexec/valgrind/memcheck-arm-linux /usr/local/libexec/valgrind/memcheck-arm-linux-wrapper && \
-    echo '#!/bin/bash' > /usr/local/libexec/valgrind/memcheck-arm-linux && \
-    echo 'exec qemu-arm-static /usr/local/libexec/valgrind/memcheck-arm-linux-wrapper "$@"' >> /usr/local/libexec/valgrind/memcheck-arm-linux && \
-    chmod +x /usr/local/libexec/valgrind/memcheck-arm-linux
-ENV VALGRIND_OPTS="--vgdb=no"
+COPY gdb riscv32db /usr/riscvbin/
+RUN chmod +x /usr/riscvbin/gdb /usr/riscvbin/riscv32db
+COPY riscv32db.1 /usr/local/man/man1/
 
 # exec hook
-COPY hook_execve.c check_arch_arm.c /
-RUN QEMU_HASH="$(sha256sum /usr/bin/qemu-arm-static | awk "{print \$1}")" && \
+COPY hook_execve.c /
+RUN QEMU_HASH="$(sha256sum /usr/bin/qemu-riscv32-static | awk "{print \$1}")" && \
     sed -i "s|PLACEHOLDER_HASH|$QEMU_HASH|g" /hook_execve.c && \
     /usr/bin/gcc -shared -fPIC -o hook_execve.so hook_execve.c -ldl -lssl -lcrypto && \
-    /usr/bin/gcc -o check_arch_arm check_arch_arm.c && \
     mv /hook_execve.so /usr/lib/hook_execve.so && \
-    mv /check_arch_arm /usr/bin/check_arch_arm && \
-    rm hook_execve.c check_arch_arm.c
+    rm hook_execve.c
 ENV LD_PRELOAD=/usr/lib/hook_execve.so
 
 # xterm rs
@@ -157,7 +128,7 @@ USER root
 RUN mkdir -p /run /var/run && \
     touch /run/fixuid.ran /var/run/fixuid.ran
 
-ENV PATH="/usr/armbin:$PATH"
+ENV PATH="/usr/riscvbin:/usr/riscv32-toolchain/bin:$PATH"
 ENV IMAGE_VERSION="v1.0.0"
 USER student
 ENTRYPOINT ["/usr/bin/container-entry"]

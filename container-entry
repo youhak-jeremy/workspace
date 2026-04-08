@@ -1,12 +1,5 @@
 #!/bin/bash
 
-/usr/bin/check_arch_arm
-RET=$?
-
-if [ "$RET" -eq 1 ]; then
-    export LD_PRELOAD=""
-fi
-
 args=()
 [[ -n $LOG_LEVEL        ]] && args+=(--log-level        "$LOG_LEVEL")
 [[ -n $VERBOSE_INTERVAL ]] && args+=(--verbose-interval "$VERBOSE_INTERVAL")

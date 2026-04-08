@@ -1,6 +1,6 @@
 #!/bin/bash
 
-usage="Usage: cse30db [GDB options] <program> [program args]
+usage="Usage: riscv32db [GDB options] <program> [program args]
 
 Accepted GDB options:
     --help, -h
@@ -17,16 +17,28 @@ Accepted GDB options:
     --quite, --silent, -q
 
 Examples:
-    cse30db ./prog                    # Run the binary prog under GDB
-    cse30db ./prog arg1 arg2          # Run prog with arguments arg1 and arg2 under GDB.
-    cse30db ./prog arg1 < input.txt   # Redirect input.txt to prog's stdin.
+    riscv32db ./prog                    # Run the binary prog under GDB
+    riscv32db ./prog arg1 arg2          # Run prog with arguments arg1 and arg2 under GDB.
+    riscv32db ./prog arg1 < input.txt   # Redirect input.txt to prog's stdin.
 
 Notes:
     - Redirection applies to the program being debugged, not GDB.
     - The 'run' command is unavailable in gdb interactive command line. The program will automatically run and stop at breakpoint 'main'.
-    - For more information, see the man page: man cse30db
+    - For more information, see the man page: man riscv32db
 "
 ORIG_DIR="$(pwd)"
+TOOLCHAIN_ROOT="${RISCV_TOOLCHAIN:-/usr/riscv32-toolchain}"
+QEMU_BIN="${QEMU_RISCV32_STATIC_PATH:-/usr/bin/qemu-riscv32-static}"
+
+find_toolchain_bin() {
+    local suffix="$1"
+    find "$TOOLCHAIN_ROOT/bin" -maxdepth 1 -type f -name "*-${suffix}" | head -n 1
+}
+
+GDB_BIN="$(find_toolchain_bin gdb)"
+if [[ -z "$GDB_BIN" ]] && command -v gdb-multiarch >/dev/null 2>&1; then
+    GDB_BIN="$(command -v gdb-multiarch)"
+fi
 
 PRE_GDB_ARGS=()
 POST_GDB_ARGS=()
@@ -69,7 +81,11 @@ while [[ $# -gt 0 ]]; do
         ;;
 
     -v | --v | -version | --version)
-        /usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-gdb --version
+        if [[ -z "$GDB_BIN" ]]; then
+            echo "Error: no RISC-V GDB found under '$TOOLCHAIN_ROOT/bin'."
+            exit 1
+        fi
+        "$GDB_BIN" --version
         exit 0
         ;;
 
@@ -195,6 +211,16 @@ if [[ -z "$BINARY" ]]; then
     print_usage_and_exit
 fi
 
+if [[ -z "$GDB_BIN" ]]; then
+    echo "Error: no RISC-V GDB found under '$TOOLCHAIN_ROOT/bin'."
+    exit 1
+fi
+
+if [[ ! -x "$QEMU_BIN" ]]; then
+    echo "Error: '$QEMU_BIN' is not executable."
+    exit 1
+fi
+
 if [[ -n "$REQUEST_CD" ]]; then
     if ! cd "$REQUEST_CD" 2>/dev/null; then
         echo "Error: cannot cd to '$REQUEST_CD'"
@@ -208,8 +234,8 @@ if [[ ! -f "$BINARY" ]]; then
 fi
 
 file_out="$(file -b "$BINARY" 2>/dev/null)"
-if [[ "$file_out" != *"ELF 32-bit LSB"* || "$file_out" != *"ARM,"* ]]; then
-    echo "Error: '$BINARY' is not a 32-bit ARM ELF."
+if [[ "$file_out" != *"ELF 32-bit LSB"* || "$file_out" != *"RISC-V"* ]]; then
+    echo "Error: '$BINARY' is not a 32-bit RISC-V ELF."
     echo "File info: $file_out"
     exit 1
 fi
@@ -220,7 +246,7 @@ QEMU_PORT=$(comm -23 <(seq 10000 20000 | sort) \
     <(netstat -tln 2>/dev/null | awk '{print $4}' | grep -oE '[0-9]+$' | sort -u) |
     shuf -n 1)
 
-/usr/bin/qemu-arm-static -g "$QEMU_PORT" "$BINARY" "${PROGRAM_ARGS[@]}" <&3 &
+"$QEMU_BIN" -g "$QEMU_PORT" "$BINARY" "${PROGRAM_ARGS[@]}" <&3 &
 QEMU_PID=$!
 
 MAX_WAIT=50
@@ -243,7 +269,7 @@ else
     GDB_TTY="/dev/tty"
 fi
 
-/usr/arm-gnu-toolchain/bin/arm-none-linux-gnueabihf-gdb \
+"$GDB_BIN" \
     "${PRE_GDB_ARGS[@]}" \
     --ex="file $BINARY" \
     --ex="target remote localhost:$QEMU_PORT" \
@@ -253,4 +279,3 @@ fi
     <"$GDB_TTY" >"$GDB_TTY"
 
 kill "$QEMU_PID" 2>/dev/null
-

@@ -14,13 +14,13 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define QEMU_ARM_STATIC_PATH "/usr/bin/qemu-arm-static"
-#define QEMU_ARM_STATIC_HASH "PLACEHOLDER_HASH"
+#define QEMU_RISCV32_STATIC_PATH "/usr/bin/qemu-riscv32-static"
+#define QEMU_RISCV32_STATIC_HASH "PLACEHOLDER_HASH"
 
 typedef int (*real_execve_t)(const char *filename, char *const argv[], char *const envp[]);
 
 void build_new_argv(const char *filename, const size_t argc, char *const argv[], char **new_argv) {
-    new_argv[0] = QEMU_ARM_STATIC_PATH;
+    new_argv[0] = QEMU_RISCV32_STATIC_PATH;
     new_argv[1] = (char*)filename;
     for (size_t i = 1; i < argc; ++i) new_argv[i + 1] = argv[i];
     new_argv[argc + 1] = NULL;
@@ -35,7 +35,7 @@ void build_new_envp(const size_t envc, char *const envp[], char **new_envp) {
     new_envp[j] = NULL;
 }
 
-int check_qemu_arm_static(const char *filepath) {
+int check_qemu_riscv32_static(const char *filepath) {
     unsigned char output[EVP_MAX_MD_SIZE];
     FILE *file = fopen(filepath, "rb");
     if (!file) {
@@ -81,10 +81,10 @@ int check_qemu_arm_static(const char *filepath) {
     fclose(file);
     char hash_string[SHA256_DIGEST_LENGTH * 2 + 1];
     for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) { sprintf(&hash_string[i * 2], "%02x", output[i]); }
-    return strcmp(hash_string, QEMU_ARM_STATIC_HASH) ? 1 : 0;
+    return strcmp(hash_string, QEMU_RISCV32_STATIC_HASH) ? 1 : 0;
 }
 
-int check_arm_elf(const char *filepath) {
+int check_riscv32_elf(const char *filepath) {
     int fd = open(filepath, O_RDONLY);
     if (fd < 0) {
         perror("open");
@@ -92,7 +92,7 @@ int check_arm_elf(const char *filepath) {
     }
     Elf32_Ehdr elf_header;
     ssize_t read_bytes = read(fd, &elf_header, sizeof(Elf32_Ehdr));
-    if ((read_bytes != sizeof(Elf32_Ehdr)) || (memcmp(elf_header.e_ident, ELFMAG, SELFMAG) != 0) || (elf_header.e_ident[EI_CLASS] != ELFCLASS32) || (elf_header.e_machine != EM_ARM) ||
+    if ((read_bytes != sizeof(Elf32_Ehdr)) || (memcmp(elf_header.e_ident, ELFMAG, SELFMAG) != 0) || (elf_header.e_ident[EI_CLASS] != ELFCLASS32) || (elf_header.e_machine != EM_RISCV) ||
         (elf_header.e_type != ET_EXEC && elf_header.e_type != ET_DYN)) {
         close(fd);
         return 1;
@@ -121,16 +121,16 @@ int execve(const char *filename, char *const argv[], char *const envp[]) {
     char filepath[PATH_MAX];
     int invalid_path = get_realpath(filename, filepath);
 
-    if (invalid_path == 0 && check_arm_elf(filepath) == 0) {
+    if (invalid_path == 0 && check_riscv32_elf(filepath) == 0) {
         size_t argc = 0, envc = 0;
         while (argv[argc] != NULL) ++argc;
         while (envp[envc] != NULL) ++envc;
         char *new_argv[argc + 2], *new_envp[envc + 1];
         build_new_argv(filename, argc, argv, new_argv);
         build_new_envp(envc, envp, new_envp);
-        return real_execve(QEMU_ARM_STATIC_PATH, new_argv, new_envp);
+        return real_execve(QEMU_RISCV32_STATIC_PATH, new_argv, new_envp);
     }
-    if (invalid_path == 0 && check_qemu_arm_static(filepath) == 0) {
+    if (invalid_path == 0 && check_qemu_riscv32_static(filepath) == 0) {
         size_t envc = 0;
         while (envp[envc] != NULL) ++envc;
         char *new_envp[envc + 1];
@@ -140,4 +140,3 @@ int execve(const char *filename, char *const argv[], char *const envp[]) {
 
     return real_execve(filename, argv, envp);
 }
-

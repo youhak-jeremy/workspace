@@ -1,31 +1,31 @@
-.TH CSE30DB 1 "2025-01-08" "cse30db" "GNU Development Tools"
+.TH RISCV32DB 1 "2026-04-07" "riscv32db" "GNU Development Tools"
 .SH "NAME"
-cse30db \- A script for debugging ARM programs with QEMU and GDB
+riscv32db \- A script for debugging RISC-V programs with QEMU and GDB
 .SH "SYNOPSIS"
-.B cse30db
+.B riscv32db
 [\fIGDB options\fR] <\fIprog\fR> [\fIprogram args\fR]
 .SH "DESCRIPTION"
-cse30db is a wrapper script for running ARM programs under GDB client using QEMU. 
+riscv32db is a wrapper script for running 32-bit RISC-V programs under GDB client using QEMU.
 It simplifies debugging by automating the setup process for remote debugging.
 
 .SH "EXAMPLES"
-The following examples demonstrate common use cases for \fBcse30db\fR:
+The following examples demonstrate common use cases for \fBriscv32db\fR:
 
 .TP
-.B cse30db ./prog
+.B riscv32db ./prog
 Run the binary \fIprog\fR under GDB.
 
 .TP
-.B cse30db ./prog arg1 arg2
+.B riscv32db ./prog arg1 arg2
 Run the binary \fIprog\fR with arguments \fIarg1\fR and \fIarg2\fR under GDB.
 
 .TP
-.B cse30db ./prog arg1 arg2 < input.txt
+.B riscv32db ./prog arg1 arg2 < input.txt
 Run \fIprog\fR with arguments \fIarg1\fR and \fIarg2\fR while redirecting
 \fIinput.txt\fR to the program's stdin.
 
 .TP
-.B cse30db --cd="../" --ex="next" ./prog arg1
+.B riscv32db --cd="../" --ex="next" ./prog arg1
 Run \fIprog\fR with arguments \fIarg1\fR in the parent directory and execute the GDB command "\fBnext\fR" after loading the inferior.
 
 .SH "NOTES"
