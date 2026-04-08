@@ -129,6 +129,7 @@ RUN mkdir -p /run /var/run && \
     touch /run/fixuid.ran /var/run/fixuid.ran
 
 ENV PATH="/usr/riscvbin:/usr/riscv32-toolchain/bin:$PATH"
+ENV GCC_WRAPPER_FLAGS="-march=rv32im -mabi=ilp32"
 ENV IMAGE_VERSION="v1.0.0"
 USER student
 ENTRYPOINT ["/usr/bin/container-entry"]
