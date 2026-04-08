@@ -7,7 +7,7 @@ A high-performance Docker workspace designed specifically for RISC-V LAB. This c
 docker buildx build --platform linux/amd64 -t workspace .
 
 docker run -d --platform linux/amd64 -p 9000:8080 \
-  -v "$(pwd)/work:/home/student/work" \
+  -v "$(pwd)/examples:/home/student/examples" \
   --name riscv32ws \
   workspace
 ```
