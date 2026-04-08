@@ -1,4 +1,4 @@
-text
+    .text
     .globl add
     .type add, @function
 
