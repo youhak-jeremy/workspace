@@ -1,11 +1,15 @@
-# CSE 30 RISC-V Workspace Container
+# RISC-V Workspace Container
 
-A high-performance Docker workspace designed specifically for UCSD CSE 30 Course. This container allows teaching 32-bit RISC-V assembly and systems programming when students or cloud platforms (like Prairielearn, Gradescope or GitHub Codespaces) are limited to x86 environments.
+A high-performance Docker workspace designed specifically for RISC-V LAB. This container allows teaching 32-bit RISC-V assembly and systems programming when students or cloud platforms (like Prairielearn, Gradescope or GitHub Codespaces) are limited to x86 environments.
 
 # 0. Getting Started
 ```
-docker buildx build -t workspace .
-docker run -d -p 9000:8080 -it workspace
+docker buildx build --platform linux/amd64 -t workspace .
+
+docker run -d --platform linux/amd64 -p 9000:8080 \
+  -v "$(pwd)/work:/home/student/work" \
+  --name riscv32ws \
+  workspace
 ```
 
 # 1. Key Features
@@ -48,4 +52,4 @@ man riscv32db
 
 
 # 4. Use Case: Education at Scale
-In CSE 30, providing a consistent environment is critical. This image ensures that whether a student is on an Intel Mac, a Windows PC, or using a cloud-based grading platform, the behavior of their RISC-V assembly code remains identical. It removes the "it works on my machine" barrier and allows instructors to focus on teaching systems concepts rather than troubleshooting environment issues.
+In RISC-V, providing a consistent environment is critical. This image ensures that whether a student is on an Intel Mac, a Windows PC, or using a cloud-based grading platform, the behavior of their RISC-V assembly code remains identical. It removes the "it works on my machine" barrier and allows instructors to focus on teaching systems concepts rather than troubleshooting environment issues.
