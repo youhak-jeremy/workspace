@@ -4,6 +4,8 @@ A high-performance Docker workspace designed specifically for RISC-V LAB. This c
 
 # 0. Getting Started
 ```
+git clone --recursive -b riscv32 https://github.com/youhak-jeremy/workspace.git
+cd workspace
 docker buildx build --platform linux/amd64 -t workspace .
 
 docker run -d --platform linux/amd64 -p 9000:8080 \
